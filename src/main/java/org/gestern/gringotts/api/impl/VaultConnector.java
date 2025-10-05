@@ -6,6 +6,8 @@ import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
 import org.bukkit.OfflinePlayer;
 import org.gestern.gringotts.Gringotts;
 import org.gestern.gringotts.Util;
+import org.gestern.gringotts.accountholder.AccountHolder;
+import org.gestern.gringotts.accountholder.AccountHolderFactory;
 import org.gestern.gringotts.api.Account;
 import org.gestern.gringotts.api.Eco;
 import org.gestern.gringotts.api.TransactionResult;
@@ -118,35 +120,98 @@ public class VaultConnector implements Economy {
     }
 
     @Override
-    public EconomyResponse depositPlayer(String playerName, double amount) {
-        Account account = eco.getAccount(playerName);
-        getLogger().info("[Vault] #1 depositPlayer player=" + account.id() + " amount=" + amount);
-        return depositPlayer(account, amount);
+    public EconomyResponse depositPlayer(String id, double amount) {
+        getLogger().info("[Vault] depositPlayer name=" + id + " amount=" + amount);
+
+        if (amount < 0) {
+            return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Negative amount");
+        }
+
+        // 1) resolve the holder (player / town / nation) by id (UUID or name)
+        AccountHolder holder = resolveHolder(id);
+        if (holder == null) {
+            getLogger().warning("[Vault] depositPlayer: Unknown account holder for id=" + id);
+            return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Unknown account");
+        }
+
+        // 2) resolve the actual account for that holder
+        Account account = eco.account(String.valueOf(holder));
+        if (account == null || !account.exists()) {
+            getLogger().warning("[Vault] depositPlayer: No account exists for holder id=" + holder.getId()
+                    + " type=" + holder.getType() + " name=" + holder.getName());
+            return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Unknown account");
+        }
+
+        // 3) do the deposit and return the REAL result
+        TransactionResult tr = account.add(amount);
+
+        getLogger().info("[Vault] depositPlayer resolved holderType=" + holder.getType()
+                + " holderId=" + holder.getId()
+                + " result=" + tr);
+
+        switch (tr) {
+            case SUCCESS:
+                return new EconomyResponse(amount, account.balance(), EconomyResponse.ResponseType.SUCCESS, null);
+            case INSUFFICIENT_SPACE:
+                return new EconomyResponse(0, account.balance(), EconomyResponse.ResponseType.FAILURE, "INSUFFICIENT_SPACE");
+            case INSUFFICIENT_FUNDS:
+                return new EconomyResponse(0, account.balance(), EconomyResponse.ResponseType.FAILURE, "INSUFFICIENT_FUNDS");
+            case UNSUPPORTED:
+                return new EconomyResponse(0, account.balance(), EconomyResponse.ResponseType.NOT_IMPLEMENTED, "UNSUPPORTED");
+            default:
+                return new EconomyResponse(0, account.balance(), EconomyResponse.ResponseType.FAILURE, "ERROR");
+        }
     }
+
 
     @Override
-    public EconomyResponse depositPlayer(OfflinePlayer offlinePlayer, double amount) {
-        Account account = eco.player(offlinePlayer.getUniqueId());
-        getLogger().info("[Vault] #2 depositPlayer player=" + account.id() + " amount=" + amount);
-        return depositPlayer(account, amount);
+    public EconomyResponse depositPlayer(OfflinePlayer player, double amount) {
+        // Always go through the String-based method so both paths behave the same.
+        return depositPlayer(player.getUniqueId().toString(), amount);
     }
 
+
     private EconomyResponse depositPlayer(Account account, double amount) {
+        if (account == null) {
+            getLogger().warning("[Vault] depositPlayer(Account): null account");
+            return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Unknown account");
+        }
+        if (!account.exists()) {
+            getLogger().warning("[Vault] depositPlayer(Account): account does not exist id=" + account.id());
+            return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Unknown account");
+        }
+        if (amount < 0) {
+            return new EconomyResponse(0, account.balance(), EconomyResponse.ResponseType.FAILURE, "Negative amount");
+        }
+
+        // Do the deposit
         TransactionResult added = account.add(amount);
 
-        getLogger().info("[Vault] #3 depositPlayer player=" + account.id() + " amount=" + amount);
+        // Log AFTER the add so we see the real outcome
+        getLogger().info("[Vault] depositPlayer(Account) id=" + account.id()
+                + " amount=" + amount + " result=" + added);
 
         switch (added) {
             case SUCCESS:
                 return new EconomyResponse(amount, account.balance(), ResponseType.SUCCESS, null);
+
             case INSUFFICIENT_SPACE:
-                return new EconomyResponse(0, account.balance(), ResponseType.FAILURE, LANG
-                        .plugin_vault_insufficientSpace);
+                // Typical cause for towns with no vault chest space + cents disabled.
+                return new EconomyResponse(0, account.balance(), ResponseType.FAILURE, "INSUFFICIENT_SPACE");
+
+            case INSUFFICIENT_FUNDS:
+                // Rare on deposit but handled for completeness.
+                return new EconomyResponse(0, account.balance(), ResponseType.FAILURE, "INSUFFICIENT_FUNDS");
+
+            case UNSUPPORTED:
+                return new EconomyResponse(0, account.balance(), ResponseType.NOT_IMPLEMENTED, "UNSUPPORTED");
+
             case ERROR:
             default:
-                return new EconomyResponse(0, account.balance(), ResponseType.FAILURE, LANG.plugin_vault_error);
+                return new EconomyResponse(0, account.balance(), ResponseType.FAILURE, "ERROR");
         }
     }
+
 
     @Override
     public EconomyResponse createBank(String name, String player) {
@@ -384,4 +449,33 @@ public class VaultConnector implements Economy {
     public EconomyResponse withdrawPlayer(OfflinePlayer offlinePlayer, String world, double amount) {
         return withdrawPlayer(offlinePlayer, amount); // TODO multiworld-support
     }
+
+    /** Resolves any id (player name/uuid, town uuid/name, nation uuid/name) using the AccountHolderFactory. */
+    private AccountHolder resolveHolder(String id) {
+        AccountHolderFactory fac = Gringotts.instance.getAccountHolderFactory();
+
+        // try generic resolution first (factory walks providers: player → town → nation)
+        AccountHolder h = fac.get(id);
+        if (h != null) return h;
+
+        // if it's a UUID, try type-scoped lookups too
+        try {
+            java.util.UUID uid = java.util.UUID.fromString(id);
+
+            h = fac.get("town", String.valueOf(uid));
+            if (h != null) return h;
+
+            h = fac.get("nation", String.valueOf(uid));
+            if (h != null) return h;
+
+            h = fac.get("player", String.valueOf(uid));
+            if (h != null) return h;
+
+        } catch (IllegalArgumentException ignore) {
+            // not a UUID — nothing else to try
+        }
+
+        return null;
+    }
+
 }
