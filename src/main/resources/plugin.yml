@@ -1,6 +1,7 @@
 name: Gringotts
 authors: [ jasticE, squidicuz, eXeC64, nikosgram, GroobleDierne, hhenrichsen ]
 website: https://github.com/nikosgram/Gringotts
+folia-supported: true
 
 version: ${project.version}
 main: org.gestern.gringotts.Gringotts
