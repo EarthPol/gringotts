@@ -132,18 +132,19 @@ public class GringottsEco implements Eco {
     @Override
     public Account getAccount(String id) {
         // 1) UUID-aware branch
-        java.util.UUID maybeUUID = tryParseUUID(id);
-        if (maybeUUID != null) {
+        UUID uid = tryUUID(id);
+        if (uid != null) {
             // Player UUID?
-            OfflinePlayer p = org.bukkit.Bukkit.getOfflinePlayer(maybeUUID);
+            OfflinePlayer p = Bukkit.getOfflinePlayer(uid);
             if (p != null && (p.hasPlayedBefore() || p.getName() != null)) {
-                return player(maybeUUID);
+                return player(uid);
             }
-            // Not a player UUID → let DAO/factory resolve (e.g., Towny town/nation UUID)
+
+            // Not a player UUID: let DAO/factory resolve a town/nation by UUID
             return account(id);
         }
 
-        // 2) Known "type-id" scheme ONLY
+        // 2) Known type-id scheme ONLY
         int dash = id.indexOf('-');
         if (dash > 0) {
             String type = id.substring(0, dash);
@@ -151,7 +152,7 @@ public class GringottsEco implements Eco {
             if (isKnownTag(type)) {
                 return custom(type, rest);
             }
-            // Unknown tag → fall through; treat whole string as a generic id
+            // Unknown tag → fall through; treat whole id as generic
         }
 
         // 3) Player by name?
@@ -160,21 +161,15 @@ public class GringottsEco implements Eco {
             return player(byName.getUniqueId());
         }
 
-        // 4) Generic account id (lets AccountHolderFactory resolve towns/nations by id)
+        // 4) Generic account id (lets AccountHolderFactory match a town/nation by id)
         return account(id);
     }
 
-    private static java.util.UUID tryParseUUID(String s) {
-        try { return java.util.UUID.fromString(s); } catch (IllegalArgumentException ignore) { return null; }
+    private static UUID tryUUID(String s) { try { return UUID.fromString(s); } catch (IllegalArgumentException e) { return null; } }
+    private static boolean isKnownTag(String t) {
+        return "player".equalsIgnoreCase(t) || "town".equalsIgnoreCase(t) || "nation".equalsIgnoreCase(t) || "bank".equalsIgnoreCase(t);
     }
 
-    private static boolean isKnownTag(String t) {
-        // Adjust to match your AccountHolderFactory types
-        return "player".equalsIgnoreCase(t)
-                || "town".equalsIgnoreCase(t)
-                || "nation".equalsIgnoreCase(t)
-                || "bank".equalsIgnoreCase(t);
-    }
 
 
     private static class InvalidAccount implements BankAccount, PlayerAccount {
