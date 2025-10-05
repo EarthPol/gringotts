@@ -13,6 +13,7 @@ import org.gestern.gringotts.api.TransactionResult;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.bukkit.Bukkit.getLogger;
 import static org.gestern.gringotts.Language.LANG;
 
 /**
@@ -190,29 +191,87 @@ public class VaultConnector implements Economy {
 
     @Override
     public EconomyResponse bankWithdraw(String name, double amount) {
-        return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, LANG.plugin_vault_notImplemented);
-        //    	BankAccount bank = eco.bank(name);
-        //    	TransactionResult result = bank.remove(amount);
-        //    	if (result == TransactionResult.SUCCESS)
-        //    		return new EconomyResponse(amount, bank.balance(), ResponseType.SUCCESS, "Removed " + amount + "
-        // from bank " + name);
-        //    	else
-        //    		return new EconomyResponse(0, bank.balance(), ResponseType.SUCCESS, "Failed to remove " + amount +
-        // " from bank " + name);
+        if (amount < 0) {
+            return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Negative amount");
+        }
+
+        try {
+            // Resolve the bank account by the name Towny passes in
+            Account bank = eco.getAccount(name); // or: BankAccount bank = eco.bank(name);
+            if (bank == null || !bank.exists()) {
+                return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Unknown bank: " + name);
+            }
+
+            // Attempt the withdrawal
+            TransactionResult result = bank.remove(amount);
+
+            switch (result) {
+                case SUCCESS:
+                    // amount withdrawn, return the new bank balance
+                    return new EconomyResponse(amount, bank.balance(), EconomyResponse.ResponseType.SUCCESS, null);
+
+                case INSUFFICIENT_FUNDS:
+                    return new EconomyResponse(0, bank.balance(), EconomyResponse.ResponseType.FAILURE, "INSUFFICIENT_FUNDS");
+
+                case UNSUPPORTED:
+                    return new EconomyResponse(0, bank.balance(), EconomyResponse.ResponseType.NOT_IMPLEMENTED, "UNSUPPORTED");
+
+                case INSUFFICIENT_SPACE:
+                    // Rare for withdrawals, but handle generically
+                    return new EconomyResponse(0, bank.balance(), EconomyResponse.ResponseType.FAILURE, "INSUFFICIENT_SPACE");
+
+                default:
+                    return new EconomyResponse(0, bank.balance(), EconomyResponse.ResponseType.FAILURE, "ERROR");
+            }
+        } catch (Exception e) {
+            getLogger().warning("[VaultConnector] bankWithdraw error for '" + name + "': " + e.getMessage());
+            return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Exception");
+        }
     }
+
 
     @Override
     public EconomyResponse bankDeposit(String name, double amount) {
-        return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, LANG.plugin_vault_notImplemented);
-        //    	BankAccount bank = eco.bank(name);
-        //    	TransactionResult result = bank.add(amount);
-        //    	if (result == TransactionResult.SUCCESS)
-        //    		return new EconomyResponse(amount, bank.balance(), ResponseType.SUCCESS, "Added " + amount + " to
-        // bank " + name);
-        //    	else
-        //    		return new EconomyResponse(0, bank.balance(), ResponseType.SUCCESS, "Failed to add " + amount + "
-        // to bank " + name);
+        if (amount < 0) {
+            return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Negative amount");
+        }
+
+        try {
+            // Resolve the target bank account. Use whichever your API provides:
+            // Option A (if present): BankAccount bank = eco.bank(name);
+            // Option B: resolve generic account id:
+            Account bank = eco.getAccount(name);
+            if (bank == null || !bank.exists()) {
+                return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Unknown bank: " + name);
+            }
+
+            // Perform the deposit using your economy API
+            TransactionResult result = bank.add(amount);
+
+            switch (result) {
+                case SUCCESS:
+                    return new EconomyResponse(amount, bank.balance(), EconomyResponse.ResponseType.SUCCESS, null);
+
+                case INSUFFICIENT_SPACE:
+                    // tell Towny the real cause; it may still show a generic message, but this helps logging
+                    return new EconomyResponse(0, bank.balance(), EconomyResponse.ResponseType.FAILURE, "INSUFFICIENT_SPACE");
+
+                case UNSUPPORTED:
+                    return new EconomyResponse(0, bank.balance(), EconomyResponse.ResponseType.NOT_IMPLEMENTED, "UNSUPPORTED");
+
+                case INSUFFICIENT_FUNDS:
+                    // rare for deposits, but handle anyway
+                    return new EconomyResponse(0, bank.balance(), EconomyResponse.ResponseType.FAILURE, "INSUFFICIENT_FUNDS");
+
+                default:
+                    return new EconomyResponse(0, bank.balance(), EconomyResponse.ResponseType.FAILURE, "ERROR");
+            }
+        } catch (Exception e) {
+            getLogger().warning("[VaultConnector] bankDeposit error for '" + name + "': " + e.getMessage());
+            return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Exception");
+        }
     }
+
 
     @Override
     public EconomyResponse isBankOwner(String name, String playerName) {
