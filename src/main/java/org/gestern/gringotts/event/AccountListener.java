@@ -17,10 +17,8 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.gestern.gringotts.AccountChest;
 import org.gestern.gringotts.Configuration;
-import org.gestern.gringotts.Gringotts;
 import org.gestern.gringotts.Util;
 
 import com.destroystokyo.paper.event.block.BlockDestroyEvent;
@@ -110,48 +108,45 @@ public class AccountListener implements Listener {
         if (Util.isValidInventory(event.getSource().getType())) {
             AccountChest chest = getAccountChestFromHolder(event.getSource());
             if (chest != null) {
-                Runnable r = new Runnable() {
-                    @Override
-                    public void run() {
-                        chest.setCachedBalance(chest.balance(true));
-                        instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
-                    }
-                };
-                Bukkit.getRegionScheduler().execute(instance, chest.chestLocation(), r);
+                Bukkit.getRegionScheduler().run(instance, chest.chestLocation(), task -> {
+                    double newBal = chest.balance(true);
+                    chest.setCachedBalance((long) newBal);
+                    Bukkit.getAsyncScheduler().runNow(instance, t -> instance.getDao().updateChestBalance(chest, (long) newBal));
+                });
             }
         }
+
         if (event.getDestination() != null && Util.isValidInventory(event.getDestination().getType())) {
             AccountChest chest = getAccountChestFromHolder(event.getDestination());
             if (chest != null) {
-                Runnable r = new Runnable() {
-                    @Override
-                    public void run() {
-                        chest.setCachedBalance(chest.balance(true));
-                        instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
-                    }
-                };
-                Bukkit.getRegionScheduler().execute(instance, chest.chestLocation(), r);
-
-
+                Bukkit.getRegionScheduler().run(instance, chest.chestLocation(), task -> {
+                    double newBal = chest.balance(true);
+                    chest.setCachedBalance((long) newBal);
+                    Bukkit.getAsyncScheduler().runNow(instance, t -> instance.getDao().updateChestBalance(chest, (long) newBal));
+                });
             }
         }
     }
 
     @EventHandler
     public void onDispenseEvent(BlockDispenseEvent event) {
-        if (event.getBlock().getState() instanceof InventoryHolder) {
-            AccountChest chest = getAccountChestFromHolder(((InventoryHolder) event.getBlock().getState()).getInventory());
-            if (chest != null) {
-                Runnable r = new Runnable() {
-                    @Override
-                    public void run() {
-                        chest.setCachedBalance(chest.balance(true));
-                        instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
-                    }
-                };
-                Bukkit.getRegionScheduler().execute(instance, chest.chestLocation(), r);
-            }
+        if (!(event.getBlock().getState() instanceof InventoryHolder holder)) {
+            return;
         }
+
+        AccountChest chest = getAccountChestFromHolder(holder.getInventory());
+        if (chest == null) {
+            return;
+        }
+
+        Bukkit.getRegionScheduler().run(instance, chest.chestLocation(), task -> {
+            double newBalance = chest.balance(true);
+            chest.setCachedBalance((long) newBalance);
+
+            Bukkit.getAsyncScheduler().runNow(instance, t -> {
+                instance.getDao().updateChestBalance(chest, (long) newBalance);
+            });
+        });
     }
 
     @EventHandler

@@ -46,24 +46,28 @@ public class GringottsAccount {
      * @return will be completed after function is called
      */
     private static <V> CompletableFuture<V> callSync(Callable<V> callMe) {
-        final CompletableFuture<V> f = new CompletableFuture<>();
-
-        Runnable runMe = () -> {
-            try {
-                f.complete(callMe.call());
-            } catch (Exception e) {
-                f.completeExceptionally(e);
-            }
-        };
+        CompletableFuture<V> future = new CompletableFuture<>();
 
         if (Bukkit.isPrimaryThread()) {
-            runMe.run();
+            try {
+                future.complete(callMe.call());
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
         } else {
-            Bukkit.getGlobalRegionScheduler().execute(Gringotts.instance, runMe);
+            Bukkit.getGlobalRegionScheduler().execute(Gringotts.instance, () -> {
+                try {
+                    future.complete(callMe.call());
+                } catch (Exception e) {
+                    future.completeExceptionally(e);
+                }
+            });
         }
 
-        return f;
+        return future;
     }
+
+
 
     /**
      * Current balance of this account in cents
