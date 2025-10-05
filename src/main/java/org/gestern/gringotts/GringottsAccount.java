@@ -69,12 +69,26 @@ public class GringottsAccount {
 
 
 
+
+
+
+    /**
+     * Current balance of this account in cents
+     *
+     * @return current balance of this account in cents
+     */
     /**
      * Current balance of this account in cents
      *
      * @return current balance of this account in cents
      */
     public long getBalance() {
+        // Non-player accounts are fully virtual.
+        if (isNonPlayer()) {
+            return dao.retrieveCents(this);
+        }
+
+        // Players remain physical (existing behavior)
         CompletableFuture<Long> cents            = getCents();
         CompletableFuture<Long> playerInv        = countPlayerInventory();
         CompletableFuture<Long> playerEnderchest = countPlayerEnderchest();
@@ -88,6 +102,7 @@ public class GringottsAccount {
 
         return getTimeout(f);
     }
+
 
     /**
      * Current balance this account has in chest(s) in cents
@@ -148,7 +163,22 @@ public class GringottsAccount {
      * @param amount amount in cents to add
      * @return Whether amount successfully added
      */
+    /**
+     * Add an amount in cents to this account if able to.
+     *
+     * @param amount amount in cents to add
+     * @return Whether amount successfully added
+     */
     public TransactionResult add(long amount) {
+        // Virtual-only path for non-player accounts (towns/nations)
+        if (isNonPlayer()) {
+            if (amount < 0) return TransactionResult.ERROR;
+            long cur = dao.retrieveCents(this);
+            dao.storeCents(this, cur + amount);
+            return TransactionResult.SUCCESS;
+        }
+
+        // ===== Players remain physical below (existing logic preserved) =====
         Callable<TransactionResult> callMe = () -> {
             // Cannot add negative amount
             if (amount < 0) {
@@ -253,6 +283,14 @@ public class GringottsAccount {
         return getTimeout(callSync(callMe));
     }
 
+
+    /**
+     * Attempt to remove an amount in cents from this account.
+     * If the account contains less than the specified amount, returns false
+     *
+     * @param amount amount in cents to remove
+     * @return amount actually removed.
+     */
     /**
      * Attempt to remove an amount in cents from this account.
      * If the account contains less than the specified amount, returns false
@@ -261,6 +299,19 @@ public class GringottsAccount {
      * @return amount actually removed.
      */
     public TransactionResult remove(long amount) {
+        // Virtual-only path for non-player accounts (towns/nations)
+        if (isNonPlayer()) {
+            if (amount < 0) return TransactionResult.ERROR;
+
+            long cur = dao.retrieveCents(this);
+            if (cur < amount) {
+                return TransactionResult.INSUFFICIENT_FUNDS;
+            }
+            dao.storeCents(this, cur - amount);
+            return TransactionResult.SUCCESS;
+        }
+
+        // ===== Players remain physical below (existing logic preserved) =====
         Callable<TransactionResult> callMe = () -> {
             // Cannot remove negative amount
             if (amount < 0) {
@@ -325,6 +376,7 @@ public class GringottsAccount {
 
         return getTimeout(callSync(callMe));
     }
+
 
     public long addToShulkerBox(long remaining, Inventory inventory) {
         for (ItemStack itemStack : inventory.getContents()) {
@@ -485,6 +537,11 @@ public class GringottsAccount {
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             throw new GringottsException(e);
         }
+    }
+
+    /** Non-player holders (e.g., Town/Nation) should be virtual-only. */
+    private boolean isNonPlayer() {
+        return !(owner instanceof PlayerAccountHolder);
     }
 
 }

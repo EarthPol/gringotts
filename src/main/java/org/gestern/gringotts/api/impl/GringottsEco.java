@@ -44,6 +44,8 @@ public class GringottsEco implements Eco {
         return new ValidAccount(gAccount);
     }
 
+    
+
     /**
      * Player player account.
      *

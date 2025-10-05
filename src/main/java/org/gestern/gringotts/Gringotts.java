@@ -417,4 +417,25 @@ public class Gringotts extends JavaPlugin {
     public PendingOperationManager getPendingOperationManager() {
         return pendingOperationManager;
     }
+
+    private final java.util.concurrent.ConcurrentHashMap<String, Double> nonPlayerVirtual =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    public double getVirtualBalance(String id) {
+        return nonPlayerVirtual.getOrDefault(id, 0.0);
+    }
+
+    public void depositVirtual(String id, double amount) {
+        if (amount <= 0) return;
+        nonPlayerVirtual.merge(id, amount, Double::sum);
+    }
+
+    public boolean withdrawVirtual(String id, double amount) {
+        if (amount <= 0) return false;
+        return nonPlayerVirtual.compute(id, (k, v) -> {
+            double cur = (v == null ? 0.0 : v);
+            if (cur < amount) return cur; // insufficient, no change
+            return cur - amount;
+        }) != null && getVirtualBalance(id) >= 0.0;
+    }
 }
