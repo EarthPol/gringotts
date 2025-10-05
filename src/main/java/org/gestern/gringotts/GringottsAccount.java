@@ -59,7 +59,7 @@ public class GringottsAccount {
         if (Bukkit.isPrimaryThread()) {
             runMe.run();
         } else {
-            Bukkit.getScheduler().scheduleSyncDelayedTask(Gringotts.instance, runMe);
+            Bukkit.getGlobalRegionScheduler().execute(Gringotts.instance, runMe);
         }
 
         return f;
