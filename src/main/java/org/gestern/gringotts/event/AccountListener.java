@@ -27,6 +27,8 @@ import com.destroystokyo.paper.event.block.BlockDestroyEvent;
 
 import io.papermc.paper.event.player.PlayerOpenSignEvent;
 
+import static org.gestern.gringotts.Gringotts.instance;
+
 /**
  * Listens for chest creation, destruction and change events.
  *
@@ -83,7 +85,7 @@ public class AccountListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onSignBreak(BlockDestroyEvent event) {
         if (Tag.SIGNS.isTagged(event.getBlock().getType())) {
-            Gringotts.instance.getDao().deleteAccountChest(
+            instance.getDao().deleteAccountChest(
                 event.getBlock().getWorld().getName(),
                 event.getBlock().getX(),
                 event.getBlock().getY(),
@@ -100,7 +102,7 @@ public class AccountListener implements Listener {
         if (chest == null) return;
 
         chest.setCachedBalance(chest.balance(true));
-        Gringotts.instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
+        instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -108,25 +110,29 @@ public class AccountListener implements Listener {
         if (Util.isValidInventory(event.getSource().getType())) {
             AccountChest chest = getAccountChestFromHolder(event.getSource());
             if (chest != null) {
-                new BukkitRunnable() {
+                Runnable r = new Runnable() {
                     @Override
                     public void run() {
                         chest.setCachedBalance(chest.balance(true));
-                        Gringotts.instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
+                        instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
                     }
-                }.runTask(Gringotts.instance);
+                };
+                Bukkit.getRegionScheduler().execute(instance, chest.chestLocation(), r);
             }
         }
         if (event.getDestination() != null && Util.isValidInventory(event.getDestination().getType())) {
             AccountChest chest = getAccountChestFromHolder(event.getDestination());
             if (chest != null) {
-                new BukkitRunnable() {
+                Runnable r = new Runnable() {
                     @Override
                     public void run() {
                         chest.setCachedBalance(chest.balance(true));
-                        Gringotts.instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
+                        instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
                     }
-                }.runTask(Gringotts.instance);
+                };
+                Bukkit.getRegionScheduler().execute(instance, chest.chestLocation(), r);
+
+
             }
         }
     }
@@ -136,20 +142,21 @@ public class AccountListener implements Listener {
         if (event.getBlock().getState() instanceof InventoryHolder) {
             AccountChest chest = getAccountChestFromHolder(((InventoryHolder) event.getBlock().getState()).getInventory());
             if (chest != null) {
-                new BukkitRunnable() {
+                Runnable r = new Runnable() {
                     @Override
                     public void run() {
                         chest.setCachedBalance(chest.balance(true));
-                        Gringotts.instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
+                        instance.getDao().updateChestBalance(chest, chest.getCachedBalance());
                     }
-                }.runTask(Gringotts.instance);
+                };
+                Bukkit.getRegionScheduler().execute(instance, chest.chestLocation(), r);
             }
         }
     }
 
     @EventHandler
     public void onSignEdit(PlayerOpenSignEvent event) {
-        for (AccountChest chest : Gringotts.instance.getDao().retrieveChests()) {
+        for (AccountChest chest : instance.getDao().retrieveChests()) {
             if (!chest.isChestLoaded()) continue; // For a sign to be changed, it needs to be loaded
             if (event.getSign().getLocation().equals(chest.sign.getLocation())) {
                 event.setCancelled(true);
@@ -164,7 +171,7 @@ public class AccountListener implements Listener {
      * @return the {@link AccountChest} or null if none was found
      */
     private AccountChest getAccountChestFromHolder(Inventory holder) {
-        for (AccountChest chest : Gringotts.instance.getDao().retrieveChests()) {
+        for (AccountChest chest : instance.getDao().retrieveChests()) {
             if (!chest.isChestLoaded()) continue; // For a chest to be open or interacted with, it needs to be loaded
 
             if (chest.matchesLocation(holder.getLocation())) {

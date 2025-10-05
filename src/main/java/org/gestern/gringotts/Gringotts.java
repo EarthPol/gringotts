@@ -108,14 +108,14 @@ public class Gringotts extends JavaPlugin {
             // just call DAO once to ensure it's loaded before startup is complete
             dao = getDAO();
 
-            new BukkitRunnable() {
-                // Run once worlds are loaded
+            Runnable loadChests = new Runnable() {
                 @Override
                 public void run() {
                     dao.retrieveChests();
                     pendingOperationManager.init();
                 }
-            }.runTask(instance);
+            };
+            Bukkit.getGlobalRegionScheduler().execute(instance, loadChests);
 
             // load and init configuration
             saveDefaultConfig(); // saves default configuration if no config.yml exists yet
