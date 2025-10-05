@@ -11,7 +11,7 @@ database: true
 api-version: "1.20"
 api: "1.20"
 
-softdepend: [ PlaceholderAPI ]
+softdepend: [ PlaceholderAPI, Towny ]
 loadbefore: [ Vault ]
 
 libraries:

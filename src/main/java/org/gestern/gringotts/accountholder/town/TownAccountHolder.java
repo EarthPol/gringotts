@@ -1,76 +1,63 @@
 package org.gestern.gringotts.accountholder.town;
 
-import com.palmergames.bukkit.towny.TownyAPI;
 import com.palmergames.bukkit.towny.object.Town;
 import org.gestern.gringotts.accountholder.AccountHolder;
+import org.jetbrains.annotations.NotNull;
 
-/**
- * The type Town account holder.
- */
-public class TownAccountHolder implements AccountHolder {
+import java.util.Objects;
+
+/** Gringotts AccountHolder wrapper for a Towny Town. */
+public final class TownAccountHolder implements AccountHolder {
+
     public static final String ACCOUNT_TYPE = "town";
-    private final       Town   town;
 
-    /**
-     * Instantiates a new Town account holder.
-     *
-     * @param town the town
-     */
-    TownAccountHolder(Town town) {
+    private final Town town;
+
+    public TownAccountHolder(@NotNull Town town) {
         this.town = town;
     }
 
-    /**
-     * Return name of the account holder.
-     *
-     * @return name of the account holder
-     */
     @Override
-    public String getName() {
-        return this.town.getName();
+    public @NotNull String getName() {
+        return town.getName();
     }
 
-    /**
-     * Send message to the account holder.
-     *
-     * @param message to send
-     */
     @Override
-    public void sendMessage(String message) {
-        TownyAPI.getInstance().getOnlinePlayers(this.town).forEach(player -> player.sendMessage(message));
+    public void sendMessage(@NotNull String message) {
+        // No-op by default. If you want broadcast, wire TownyMessaging here.
+        // Example (optional):
+        // TownyMessaging.sendPrefixedTownMessage(town, message);
     }
 
-    /**
-     * Type of the account holder. For instance "faction" or "player".
-     *
-     * @return account holder type
-     */
     @Override
-    public String getType() {
+    public @NotNull String getType() {
         return ACCOUNT_TYPE;
     }
 
-    /**
-     * A unique identifier for the account holder.
-     * For players, this is simply the name. For factions, it is their id.
-     *
-     * @return unique account holder id
-     */
     @Override
-    public String getId() {
-        return this.town.getUUID().toString();
+    public @NotNull String getId() {
+        // Use UUID string to match what Towny passes to Vault
+        return town.getUUID().toString();
     }
 
     @Override
-    public boolean hasPermission(String permission) {
-        return false;
+    public boolean hasPermission(@NotNull String permission) {
+        // Towns do not have a single permission-bearing owner
+        return true;
     }
 
-    /**
-     * The town onwing this account
-     * @return town object
-     */
-    public Town getTown() {
-        return this.town;
+    public @NotNull Town getTown() { return town; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof TownAccountHolder)) return false;
+        TownAccountHolder that = (TownAccountHolder) o;
+        return Objects.equals(town.getUUID(), that.town.getUUID());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(town.getUUID());
     }
 }

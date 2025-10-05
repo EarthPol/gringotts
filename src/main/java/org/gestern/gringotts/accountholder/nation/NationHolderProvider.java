@@ -1,170 +1,56 @@
 package org.gestern.gringotts.accountholder.nation;
 
-
 import com.palmergames.bukkit.towny.TownyUniverse;
-import com.palmergames.bukkit.towny.event.RenameNationEvent;
-import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
 import com.palmergames.bukkit.towny.object.Nation;
-import com.palmergames.bukkit.towny.object.Resident;
-import com.palmergames.bukkit.towny.object.Town;
-import com.palmergames.bukkit.towny.object.TownyObject;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-
-import org.gestern.gringotts.Configuration;
-import org.gestern.gringotts.Gringotts;
-import org.gestern.gringotts.GringottsAccount;
 import org.gestern.gringotts.accountholder.AccountHolder;
 import org.gestern.gringotts.accountholder.AccountHolderProvider;
-import org.gestern.gringotts.event.CalculateStartBalanceEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * The type Nation holder provider.
- */
-public class NationHolderProvider implements AccountHolderProvider, Listener {
-    /**
-     * Get the AccountHolder object mapped to the given id for this provider.
-     *
-     * @param id id of account holder
-     * @return account holder for id
-     */
+public final class NationHolderProvider implements AccountHolderProvider {
+
+    @Override
+    public @NotNull String getType() {
+        return "nation";
+    }
+
+    /** Resolve by String (UUID string or nation name). */
     @Override
     public @Nullable AccountHolder getAccountHolder(@NotNull String id) {
-        try {
-            UUID targetUuid = UUID.fromString(id);
-
-            return getAccountHolder(targetUuid);
-        } catch (IllegalArgumentException ignored) {}
-
-        String vaultPrefix = NationAccountHolder.ACCOUNT_TYPE + "-";
-
-        Nation nation;
-
-        if (id.startsWith(vaultPrefix)) {
-            nation = TownyUniverse.getInstance().getNation(id.substring(vaultPrefix.length()));
-        } else {
-            nation = TownyUniverse.getInstance().getNation(id);
+        UUID uid = tryUUID(id);
+        if (uid != null) {
+            return getAccountHolder(uid);
         }
-
-        return getAccountHolder(nation);
+        Nation n = TownyUniverse.getInstance().getNation(id);
+        return n == null ? null : new NationAccountHolder(n);
     }
 
-    /**
-     * Get the AccountHolder object mapped to the given id for this provider.
-     *
-     * @param uuid id of account holder
-     * @return account holder for id
-     */
+    /** Resolve by UUID (Nation UUID). */
     @Override
     public @Nullable AccountHolder getAccountHolder(@NotNull UUID uuid) {
-        Nation nation = TownyUniverse.getInstance().getNation(uuid);
-
-        return getAccountHolder(nation);
+        Nation n = TownyUniverse.getInstance().getNation(uuid);
+        return n == null ? null : new NationAccountHolder(n);
     }
 
-    /**
-     * Get a TownyAccountHolder for the nation of which player is a resident, if
-     * any.
-     *
-     * @param player player to get nation for
-     * @return TownyAccountHolder for the nation of which player is a resident, if
-     * any. null otherwise.
-     */
+    /** Not applicable for nations; always null. */
     @Override
     public @Nullable AccountHolder getAccountHolder(@NotNull OfflinePlayer player) {
-        try {
-            Resident resident = TownyUniverse.getInstance().getResident(player.getUniqueId());
-
-            if (resident == null) {
-                return null;
-            }
-
-            Town   town   = resident.getTown();
-            Nation nation = town.getNation();
-
-            return getAccountHolder(nation);
-        } catch (NotRegisteredException ignored) {}
-
         return null;
     }
 
-    /**
-     * Gets type.
-     *
-     * @return the type
-     */
-    @Override
-    public @NotNull String getType() {
-        return NationAccountHolder.ACCOUNT_TYPE;
-    }
-
-    /**
-     * Gets account names.
-     *
-     * @return the account names
-     */
     @Override
     public @NotNull Set<String> getAccountNames() {
-        return TownyUniverse.getInstance().getNations().stream().map(TownyObject::getName).collect(Collectors.toSet());
+        return TownyUniverse.getInstance().getNations()
+                .stream()
+                .map(Nation::getName)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    /**
-     * Gets account holder.
-     *
-     * @param nation the nation
-     * @return the account holder
-     */
-    public @Nullable AccountHolder getAccountHolder(@Nullable Nation nation) {
-        if (nation == null) {
-            return null;
-        }
-
-        return new NationAccountHolder(nation);
-    }
-
-    /**
-     * Rename nation.
-     *
-     * @param event the event
-     */
-    @EventHandler
-    public void renameNation(RenameNationEvent event) {
-        Nation nation = event.getNation();
-
-        AccountHolder holder = this.getAccountHolder(nation);
-
-        if (holder == null) {
-            return;
-        }
-
-        GringottsAccount account = Gringotts.instance.getAccounting().getAccount(holder);
-
-        if (account == null) {
-            return;
-        }
-
-        //Gringotts.instance.getDao().retrieveChests(account).forEach(AccountChest::updateSign);
-
-    }
-
-    /**
-     * Calculate start balance.
-     *
-     * @param event the event
-     */
-    @EventHandler
-    public void calculateStartBalance(CalculateStartBalanceEvent event) {
-        if (!event.holder.getType().equals(getType())) {
-            return;
-        }
-
-        event.startValue = Configuration.CONF.getCurrency().getCentValue(0);
+    private static @Nullable UUID tryUUID(String s) {
+        try { return UUID.fromString(s); } catch (IllegalArgumentException e) { return null; }
     }
 }

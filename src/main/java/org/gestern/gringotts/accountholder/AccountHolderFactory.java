@@ -1,206 +1,123 @@
 package org.gestern.gringotts.accountholder;
 
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.gestern.gringotts.accountholder.nation.NationAccountHolder;
 import org.gestern.gringotts.accountholder.nation.NationHolderProvider;
-import org.gestern.gringotts.accountholder.town.TownAccountHolder;
 import org.gestern.gringotts.accountholder.town.TownHolderProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 /**
- * Manages creating various types of AccountHolder centrally.
- *
- * @author jast
+ * Resolves AccountHolder objects by id and type using registered providers.
+ * Order matters: player first, then town, then nation.
  */
-public class AccountHolderFactory implements Iterable<AccountHolderProvider> {
+public class AccountHolderFactory {
 
-    private final Map<String, AccountHolderProvider> accountHolderProviders = new LinkedHashMap<>();
+    private final LinkedHashMap<String, AccountHolderProvider> accountHolderProviders = new LinkedHashMap<>();
 
-    /**
-     * Instantiates a new Account holder factory.
-     */
     public AccountHolderFactory() {
-        // linked HashMap maintains iteration order -> prefer player to be checked first
+        // Player provider always available
         accountHolderProviders.put("player", new PlayerAccountHolderProvider());
-        accountHolderProviders.put("town", new TownHolderProvider());
-        accountHolderProviders.put("nation", new NationHolderProvider());
 
-        // TODO support banks
-        // TODO support virtual accounts
+        // Only add Towny providers when Towny is actually installed
+        if (Bukkit.getPluginManager().getPlugin("Towny") != null) {
+            accountHolderProviders.put("town",   new TownHolderProvider());
+            accountHolderProviders.put("nation", new NationHolderProvider());
+        }
     }
 
-    /**
-     * Get an account holder with automatically determined type, based on the owner's id.
-     *
-     * @param owner name of the account holder
-     * @return account holder for the given owner name, or null if none could be determined
-     */
-    public AccountHolder get(String owner) {
+    public @NotNull Optional<AccountHolderProvider> getProvider(@Nullable String type) {
+        if (type == null) return Optional.empty();
+        return Optional.ofNullable(accountHolderProviders.get(type.toLowerCase(Locale.ROOT)));
+    }
+
+    public boolean hasProvider(@Nullable String type) {
+        return getProvider(type).isPresent();
+    }
+
+    /** All registered type keys in priority order (player → town → nation). */
+    public @NotNull List<String> getTypes() {
+        return new ArrayList<>(accountHolderProviders.keySet());
+    }
+
+    /** Resolve holder by opaque id (UUID string, name, etc.). */
+    public @Nullable AccountHolder get(@NotNull String id) {
         for (AccountHolderProvider provider : accountHolderProviders.values()) {
-            AccountHolder accountHolder = provider.getAccountHolder(owner);
-
-            if (accountHolder != null) {
-                return accountHolder;
-            }
+            AccountHolder h = provider.getAccountHolder(id);
+            if (h != null) return h;
         }
-
         return null;
     }
 
-    /**
-     * Get an account holder with automatically determined type, based on the owner's id.
-     *
-     * @param uuid the user id
-     * @return account holder for the given owner name, or null if none could be determined
-     */
-    public AccountHolder get(UUID uuid) {
-        for (AccountHolderProvider provider : accountHolderProviders.values()) {
-            AccountHolder accountHolder = provider.getAccountHolder(uuid);
-
-            if (accountHolder != null) {
-                return accountHolder;
-            }
-        }
-
-        return null;
+    /** Resolve holder by explicit type and id. */
+    public @Nullable AccountHolder get(@NotNull String type, @NotNull String id) {
+        AccountHolderProvider p = accountHolderProviders.get(type.toLowerCase(Locale.ROOT));
+        return p == null ? null : p.getAccountHolder(id);
     }
 
-    /**
-     * Get an account holder with automatically determined type, based on the owner's id.
-     *
-     * @param player the user id
-     * @return account holder for the given owner name, or null if none could be determined
-     */
-    public AccountHolder get(OfflinePlayer player) {
-        for (AccountHolderProvider provider : accountHolderProviders.values()) {
-            AccountHolder accountHolder = provider.getAccountHolder(player);
-
-            if (accountHolder != null) {
-                return accountHolder;
-            }
-        }
-
-        return null;
+    /** Reverse map to a known type key. */
+    public @NotNull String getType(@NotNull AccountHolder holder) {
+        String n = holder.getClass().getSimpleName().toLowerCase(Locale.ROOT);
+        if (n.contains("town"))   return "town";
+        if (n.contains("nation")) return "nation";
+        return "player";
     }
 
-    /**
-     * Get an account holder of known type.
-     *
-     * @param type  type of the account
-     * @param owner name of the account holder
-     * @return account holder of given type with given owner name, or null if none could be determined or type is not supported.
-     */
-    public AccountHolder get(String type, String owner) {
-        AccountHolderProvider provider = accountHolderProviders.get(type);
-
-        if (provider != null) {
-            return provider.getAccountHolder(owner);
-        }
-
-        return null;
+    /** List all known account names for a type. */
+    public @NotNull Set<String> getAccountNames(@NotNull String type) {
+        AccountHolderProvider p = accountHolderProviders.get(type.toLowerCase(Locale.ROOT));
+        return p == null ? Collections.emptySet() : p.getAccountNames();
     }
 
-    /**
-     * Register account holder provider.
-     *
-     * @param type     the type
-     * @param provider the provider
-     */
-    public void registerAccountHolderProvider(String type, AccountHolderProvider provider) {
-        accountHolderProviders.put(type, provider);
-    }
+    /** Player provider (implements String, UUID, OfflinePlayer forms). */
+    static final class PlayerAccountHolderProvider implements AccountHolderProvider {
 
-    /**
-     * Gets provider.
-     *
-     * @param type the type
-     * @return the provider
-     */
-    public Optional<AccountHolderProvider> getProvider(String type) {
-        return Optional.ofNullable(this.accountHolderProviders.getOrDefault(type, null));
-    }
-
-    /**
-     * Returns an iterator over elements of type {@code T}.
-     *
-     * @return an Iterator.
-     */
-    @Override
-    public Iterator<AccountHolderProvider> iterator() {
-        return accountHolderProviders.values().iterator();
-    }
-
-    private static class PlayerAccountHolderProvider implements AccountHolderProvider {
         @Override
-        public @Nullable AccountHolder getAccountHolder(@NotNull String uuidOrName) {
-            try {
-                UUID targetUuid = UUID.fromString(uuidOrName);
+        public @NotNull String getType() { return "player"; }
 
-                return getAccountHolder(targetUuid);
-            } catch (IllegalArgumentException ignored) {}
+        @Override
+        public @Nullable AccountHolder getAccountHolder(@NotNull String id) {
+            UUID uuid = tryUUID(id);
+            if (uuid != null) return getAccountHolder(uuid);
 
-            // don't use getOfflinePlayer(String) because that will do a blocking web request
-            // rather iterate this array, should be quick enough
-            for (OfflinePlayer p : Bukkit.getOfflinePlayers()) {
-                if (uuidOrName.equals(p.getName())) {
-                    return getAccountHolder(p);
-                }
+            OfflinePlayer player = Bukkit.getOfflinePlayer(id);
+            if (player != null && (player.hasPlayedBefore() || player.getName() != null)) {
+                return new PlayerAccountHolder(player);
             }
-
             return null;
         }
 
         @Override
         public @Nullable AccountHolder getAccountHolder(@NotNull UUID uuid) {
             OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
-
-            //noinspection ConstantConditions
-            if (player != null) {
-                return getAccountHolder(player);
+            if (player != null && (player.hasPlayedBefore() || player.getName() != null)) {
+                return new PlayerAccountHolder(player);
             }
-
             return null;
         }
 
         @Override
         public @Nullable AccountHolder getAccountHolder(@NotNull OfflinePlayer player) {
-            // if this player has ever played on the server, they are a legit account holder
-            if (player.isOnline() || player.hasPlayedBefore()) {
+            if (player.getName() != null || player.hasPlayedBefore()) {
                 return new PlayerAccountHolder(player);
             }
-
             return null;
         }
 
-        /**
-         * Gets type.
-         *
-         * @return the type
-         */
-        @Override
-        public @NotNull String getType() {
-            return "player";
-        }
-
-        /**
-         * Gets account names.
-         *
-         * @return the account names
-         */
         @Override
         public @NotNull Set<String> getAccountNames() {
-            return Stream.of(Bukkit.getOfflinePlayers()).map(OfflinePlayer::getName).collect(Collectors.toSet());
+            return Stream.of(Bukkit.getOfflinePlayers())
+                    .map(OfflinePlayer::getName)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
         }
+    }
+
+    private static @Nullable UUID tryUUID(String s) {
+        try { return UUID.fromString(s); } catch (IllegalArgumentException e) { return null; }
     }
 }

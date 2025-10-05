@@ -1,76 +1,61 @@
 package org.gestern.gringotts.accountholder.nation;
 
-import com.palmergames.bukkit.towny.TownyAPI;
 import com.palmergames.bukkit.towny.object.Nation;
 import org.gestern.gringotts.accountholder.AccountHolder;
+import org.jetbrains.annotations.NotNull;
 
-/**
- * The type Nation account holder.
- */
-public class NationAccountHolder implements AccountHolder {
+import java.util.Objects;
+
+/** Gringotts AccountHolder wrapper for a Towny Nation. */
+public final class NationAccountHolder implements AccountHolder {
+
     public static final String ACCOUNT_TYPE = "nation";
-    private final       Nation nation;
 
-    /**
-     * Instantiates a new Nation account holder.
-     *
-     * @param nation the nation
-     */
-    NationAccountHolder(Nation nation) {
+    private final Nation nation;
+
+    public NationAccountHolder(@NotNull Nation nation) {
         this.nation = nation;
     }
 
-    /**
-     * Return name of the account holder.
-     *
-     * @return name of the account holder
-     */
     @Override
-    public String getName() {
-        return this.nation.getName();
+    public @NotNull String getName() {
+        return nation.getName();
     }
 
-    /**
-     * Send message to the account holder.
-     *
-     * @param message to send
-     */
     @Override
-    public void sendMessage(String message) {
-        TownyAPI.getInstance().getOnlinePlayers(this.nation).forEach(player -> player.sendMessage(message));
+    public void sendMessage(@NotNull String message) {
+        // No-op by default. If you want broadcast, wire TownyMessaging here.
+        // Example (optional):
+        // TownyMessaging.sendPrefixedNationMessage(nation, message);
     }
 
-    /**
-     * Type of the account holder. For instance "faction" or "player".
-     *
-     * @return account holder type
-     */
     @Override
-    public String getType() {
+    public @NotNull String getType() {
         return ACCOUNT_TYPE;
     }
 
-    /**
-     * A unique identifier for the account holder.
-     * For players, this is simply the name. For factions, it is their id.
-     *
-     * @return unique account holder id
-     */
     @Override
-    public String getId() {
-        return this.nation.getUUID().toString();
+    public @NotNull String getId() {
+        return nation.getUUID().toString();
     }
 
     @Override
-    public boolean hasPermission(String permission) {
-        return false;
+    public boolean hasPermission(@NotNull String permission) {
+        return true;
     }
 
-    /**
-     * The nation onwing this account
-     * @return nation object
-     */
-    public Nation getNation() {
-        return nation;
+    public @NotNull Nation getNation() { return nation; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof NationAccountHolder)) return false;
+        NationAccountHolder that = (NationAccountHolder) o;
+        return Objects.equals(nation.getUUID(), that.nation.getUUID());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(nation.getUUID());
     }
 }
