@@ -11,6 +11,10 @@ import java.util.stream.Stream;
 
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import org.gestern.gringotts.accountholder.nation.NationAccountHolder;
+import org.gestern.gringotts.accountholder.nation.NationHolderProvider;
+import org.gestern.gringotts.accountholder.town.TownAccountHolder;
+import org.gestern.gringotts.accountholder.town.TownHolderProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,6 +33,8 @@ public class AccountHolderFactory implements Iterable<AccountHolderProvider> {
     public AccountHolderFactory() {
         // linked HashMap maintains iteration order -> prefer player to be checked first
         accountHolderProviders.put("player", new PlayerAccountHolderProvider());
+        accountHolderProviders.put("town", new TownHolderProvider());
+        accountHolderProviders.put("nation", new NationHolderProvider());
 
         // TODO support banks
         // TODO support virtual accounts
