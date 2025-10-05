@@ -19,11 +19,15 @@ public class Accounting {
      */
     public GringottsAccount getAccount(AccountHolder owner) {
         GringottsAccount account = new GringottsAccount(owner);
-
-        Gringotts.instance.getDao().storeAccount(account);
-
+        try {
+            Gringotts.instance.getDao().storeAccount(account); // upsert-or-ignore
+        } catch (Exception ignored) {
+            // Duplicate/exists -> ignore
+        }
         return account;
     }
+
+
 
     /**
      * Determine if a given AccountChest would be connected to an AccountChest already in storage.

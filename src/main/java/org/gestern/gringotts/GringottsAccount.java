@@ -163,12 +163,6 @@ public class GringottsAccount {
      * @param amount amount in cents to add
      * @return Whether amount successfully added
      */
-    /**
-     * Add an amount in cents to this account if able to.
-     *
-     * @param amount amount in cents to add
-     * @return Whether amount successfully added
-     */
     public TransactionResult add(long amount) {
         // Virtual-only path for non-player accounts (towns/nations)
         if (isNonPlayer()) {
@@ -178,7 +172,7 @@ public class GringottsAccount {
             return TransactionResult.SUCCESS;
         }
 
-        // ===== Players remain physical below (existing logic preserved) =====
+        // ===== Players remain physical below (your original logic unchanged) =====
         Callable<TransactionResult> callMe = () -> {
             // Cannot add negative amount
             if (amount < 0) {
@@ -186,7 +180,6 @@ public class GringottsAccount {
             }
 
             long centsStored = dao.retrieveCents(this);
-
             long remaining = amount + centsStored;
 
             // add currency to account's vaults
@@ -227,8 +220,6 @@ public class GringottsAccount {
             }
 
             // allow smallest denom value as threshold for available space
-            // TODO make maximum virtual amount configurable
-            // this is under the assumption that there is always at least 1 denomination
             List<Denomination> denoms             = Configuration.CONF.getCurrency().getDenominations();
             long               smallestDenomValue = denoms.get(denoms.size() - 1).getValue();
 
@@ -243,14 +234,10 @@ public class GringottsAccount {
 
             if (Configuration.CONF.dropOverflowingItem && playerOpt.isPresent()) {
                 for (Denomination denomination : Configuration.CONF.getCurrency().getDenominations()) {
-                    if (denomination.getValue() > remaining) {
-                        continue;
-                    }
+                    if (denomination.getValue() > remaining) continue;
 
-                    // noinspection ConstantValue
                     if (denomination.getKey().type == null) {
                         Gringotts.instance.getLogger().warning("Denomination " + denomination.getUnitName() + " has no item type set!");
-
                         continue;
                     }
 
@@ -259,18 +246,11 @@ public class GringottsAccount {
                     long      denItemCount = denomination.getValue() > 0 ? remaining / denomination.getValue() : 0;
 
                     while (denItemCount > 0) {
-                        int remainderStackSize;
-
-                        if (denItemCount > stackSize) {
-                            remainderStackSize = stackSize;
-                        } else {
-                            remainderStackSize = (int) denItemCount;
-                        }
-
+                        int remainderStackSize = (denItemCount > stackSize) ? stackSize : (int) denItemCount;
                         stack.setAmount(remainderStackSize);
 
                         denItemCount -= remainderStackSize;
-                        remaining -= remainderStackSize * denomination.getValue();
+                        remaining    -= (long) remainderStackSize * denomination.getValue();
 
                         playerOpt.get().getWorld().dropItem(playerOpt.get().getLocation(), stack);
                     }
@@ -284,13 +264,7 @@ public class GringottsAccount {
     }
 
 
-    /**
-     * Attempt to remove an amount in cents from this account.
-     * If the account contains less than the specified amount, returns false
-     *
-     * @param amount amount in cents to remove
-     * @return amount actually removed.
-     */
+
     /**
      * Attempt to remove an amount in cents from this account.
      * If the account contains less than the specified amount, returns false
@@ -311,7 +285,7 @@ public class GringottsAccount {
             return TransactionResult.SUCCESS;
         }
 
-        // ===== Players remain physical below (existing logic preserved) =====
+        // ===== Players remain physical below (your original logic unchanged) =====
         Callable<TransactionResult> callMe = () -> {
             // Cannot remove negative amount
             if (amount < 0) {
@@ -376,6 +350,7 @@ public class GringottsAccount {
 
         return getTimeout(callSync(callMe));
     }
+
 
 
     public long addToShulkerBox(long remaining, Inventory inventory) {
