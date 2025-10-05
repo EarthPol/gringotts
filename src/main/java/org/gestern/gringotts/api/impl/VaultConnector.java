@@ -91,18 +91,20 @@ public class VaultConnector implements Economy {
 
     @Override
     public EconomyResponse withdrawPlayer(String accountId, double amount) {
+        getLogger().info("[Vault] #1 withdrawPlayer player=" + accountId + " amount=" + amount);
         return withdrawPlayer(eco.getAccount(accountId), amount);
     }
 
     @Override
     public EconomyResponse withdrawPlayer(OfflinePlayer offlinePlayer, double amount) {
+        getLogger().info("[Vault] #2 withdrawPlayer player=" + offlinePlayer.getName() + " amount=" + amount);
         Account account = eco.player(offlinePlayer.getUniqueId());
         return withdrawPlayer(account, amount);
     }
 
     private EconomyResponse withdrawPlayer(Account account, double amount) {
         TransactionResult removed = account.remove(amount);
-
+        getLogger().info("[Vault] #3 withdrawPlayer player=" + account.id() + " amount=" + amount);
         switch (removed) {
             case SUCCESS:
                 return new EconomyResponse(amount, account.balance(), ResponseType.SUCCESS, null);
@@ -118,17 +120,21 @@ public class VaultConnector implements Economy {
     @Override
     public EconomyResponse depositPlayer(String playerName, double amount) {
         Account account = eco.getAccount(playerName);
+        getLogger().info("[Vault] #1 depositPlayer player=" + account.id() + " amount=" + amount);
         return depositPlayer(account, amount);
     }
 
     @Override
     public EconomyResponse depositPlayer(OfflinePlayer offlinePlayer, double amount) {
         Account account = eco.player(offlinePlayer.getUniqueId());
+        getLogger().info("[Vault] #2 depositPlayer player=" + account.id() + " amount=" + amount);
         return depositPlayer(account, amount);
     }
 
     private EconomyResponse depositPlayer(Account account, double amount) {
         TransactionResult added = account.add(amount);
+
+        getLogger().info("[Vault] #3 depositPlayer player=" + account.id() + " amount=" + amount);
 
         switch (added) {
             case SUCCESS:
