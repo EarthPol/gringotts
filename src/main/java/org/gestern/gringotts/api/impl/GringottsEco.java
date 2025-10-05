@@ -131,20 +131,51 @@ public class GringottsEco implements Eco {
      */
     @Override
     public Account getAccount(String id) {
-        String[] parts = id.split("-", 2);
-
-        if (parts.length == 1) {
-            OfflinePlayer player = Util.getOfflinePlayer(id);
-
-            if (player != null) {
-                return player(player.getUniqueId());
+        // 1) UUID-aware branch
+        java.util.UUID maybeUUID = tryParseUUID(id);
+        if (maybeUUID != null) {
+            // Player UUID?
+            OfflinePlayer p = org.bukkit.Bukkit.getOfflinePlayer(maybeUUID);
+            if (p != null && (p.hasPlayedBefore() || p.getName() != null)) {
+                return player(maybeUUID);
             }
-
+            // Not a player UUID → let DAO/factory resolve (e.g., Towny town/nation UUID)
             return account(id);
         }
 
-        return custom(parts[0], parts[1]);
+        // 2) Known "type-id" scheme ONLY
+        int dash = id.indexOf('-');
+        if (dash > 0) {
+            String type = id.substring(0, dash);
+            String rest = id.substring(dash + 1);
+            if (isKnownTag(type)) {
+                return custom(type, rest);
+            }
+            // Unknown tag → fall through; treat whole string as a generic id
+        }
+
+        // 3) Player by name?
+        OfflinePlayer byName = org.gestern.gringotts.Util.getOfflinePlayer(id);
+        if (byName != null) {
+            return player(byName.getUniqueId());
+        }
+
+        // 4) Generic account id (lets AccountHolderFactory resolve towns/nations by id)
+        return account(id);
     }
+
+    private static java.util.UUID tryParseUUID(String s) {
+        try { return java.util.UUID.fromString(s); } catch (IllegalArgumentException ignore) { return null; }
+    }
+
+    private static boolean isKnownTag(String t) {
+        // Adjust to match your AccountHolderFactory types
+        return "player".equalsIgnoreCase(t)
+                || "town".equalsIgnoreCase(t)
+                || "nation".equalsIgnoreCase(t)
+                || "bank".equalsIgnoreCase(t);
+    }
+
 
     private static class InvalidAccount implements BankAccount, PlayerAccount {
 
