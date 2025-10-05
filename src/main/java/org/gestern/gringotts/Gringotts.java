@@ -6,9 +6,6 @@ import io.ebean.Transaction;
 import io.ebean.config.DatabaseConfig;
 import io.ebean.datasource.DataSourceConfig;
 import net.milkbowl.vault.economy.Economy;
-import org.bstats.bukkit.Metrics;
-import org.bstats.charts.AdvancedPie;
-import org.bstats.charts.DrilldownPie;
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.command.TabExecutor;
@@ -145,7 +142,6 @@ public class Gringotts extends JavaPlugin {
                 getLogger().info("Registered Vault interface.");
             }
 
-            registerMetrics();
         } catch (GringottsStorageException | GringottsConfigurationException e) {
             getLogger().severe(e.getMessage());
             this.disable();
@@ -247,47 +243,6 @@ public class Gringotts extends JavaPlugin {
         }
 
         getLogger().info("disabled");
-    }
-
-    private void registerMetrics() {
-        // Setup Metrics support.
-        Metrics metrics = new Metrics(this, 4998);
-
-        // Tracking the exists denominations.
-        metrics.addCustomChart(new AdvancedPie("denominationsChart", () -> {
-            Map<String, Integer> returned = new HashMap<>();
-
-            for (Denomination denomination : Configuration.CONF.getCurrency().getDenominations()) {
-                String name = denomination.getKey().type.getType().name();
-
-                if (!returned.containsKey(name)) {
-                    returned.put(name, 0);
-                }
-
-                returned.put(name, returned.get(name) + 1);
-            }
-
-            return returned;
-        }));
-
-        metrics.addCustomChart(new DrilldownPie("dependencies", () -> {
-            Map<String, Map<String, Integer>> returned = new HashMap<>();
-
-            for (Dependency dependency : this.dependencies) {
-                if (dependency.isEnabled()) {
-                    String name    = dependency.getName();
-                    String version = dependency.getVersion();
-
-                    if (name != null && version != null) {
-                        returned.put(name, new HashMap<>() {{
-                            put(version, 1);
-                        }});
-                    }
-                }
-            }
-
-            return returned;
-        }));
     }
 
     private void registerCommands() {
