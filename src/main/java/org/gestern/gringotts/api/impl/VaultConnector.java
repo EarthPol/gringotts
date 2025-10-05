@@ -4,13 +4,16 @@ import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
 import org.bukkit.OfflinePlayer;
+import org.gestern.gringotts.Configuration;
 import org.gestern.gringotts.Gringotts;
+import org.gestern.gringotts.GringottsAccount;
 import org.gestern.gringotts.Util;
 import org.gestern.gringotts.accountholder.AccountHolder;
 import org.gestern.gringotts.accountholder.AccountHolderFactory;
 import org.gestern.gringotts.api.Account;
 import org.gestern.gringotts.api.Eco;
 import org.gestern.gringotts.api.TransactionResult;
+import org.gestern.gringotts.data.DAO;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -127,27 +130,47 @@ public class VaultConnector implements Economy {
             return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Negative amount");
         }
 
-        // 1) resolve the holder (player / town / nation) by id (UUID or name)
+        // Resolve holder (player / town / nation)
         AccountHolder holder = resolveHolder(id);
         if (holder == null) {
             getLogger().warning("[Vault] depositPlayer: Unknown account holder for id=" + id);
             return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Unknown account");
         }
 
-        // 2) resolve the actual account for that holder
-        Account account = eco.account(String.valueOf(holder));
+        // ---- HARD BYPASS FOR NON-PLAYERS: directly credit DAO cents ----
+        if (isNonPlayer(holder)) {
+            try {
+                // Ensure the account exists in storage (idempotent)
+                GringottsAccount gacc = Gringotts.instance.getAccounting().getAccount(holder);
+
+                DAO dao = Gringotts.instance.getDao();
+                long cents = Configuration.CONF.getCurrency().getCentValue(amount);
+                long cur   = dao.retrieveCents(gacc);
+                dao.storeCents(gacc, cur + cents);
+
+                double newBal = Configuration.CONF.getCurrency().getDisplayValue(dao.retrieveCents(gacc));
+
+                getLogger().info("[Vault] depositPlayer NON-PLAYER virtual credit type=" + holder.getType()
+                        + " id=" + holder.getId() + " +cents=" + cents + " ->balance=" + newBal);
+
+                return new EconomyResponse(amount, newBal, EconomyResponse.ResponseType.SUCCESS, null);
+            } catch (Exception e) {
+                getLogger().severe("[Vault] depositPlayer NON-PLAYER error: " + e.getMessage());
+                return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "ERROR");
+            }
+        }
+
+        // ---- PLAYER path: use normal account logic ----
+        Account account = eco.custom(holder.getType(), holder.getId());
         if (account == null || !account.exists()) {
             getLogger().warning("[Vault] depositPlayer: No account exists for holder id=" + holder.getId()
                     + " type=" + holder.getType() + " name=" + holder.getName());
             return new EconomyResponse(0, 0, EconomyResponse.ResponseType.FAILURE, "Unknown account");
         }
 
-        // 3) do the deposit and return the REAL result
         TransactionResult tr = account.add(amount);
-
         getLogger().info("[Vault] depositPlayer resolved holderType=" + holder.getType()
-                + " holderId=" + holder.getId()
-                + " result=" + tr);
+                + " holderId=" + holder.getId() + " result=" + tr);
 
         switch (tr) {
             case SUCCESS:
@@ -162,6 +185,7 @@ public class VaultConnector implements Economy {
                 return new EconomyResponse(0, account.balance(), EconomyResponse.ResponseType.FAILURE, "ERROR");
         }
     }
+
 
 
     @Override
@@ -477,5 +501,10 @@ public class VaultConnector implements Economy {
 
         return null;
     }
+
+    private boolean isNonPlayer(org.gestern.gringotts.accountholder.AccountHolder h) {
+        return h != null && !"player".equalsIgnoreCase(h.getType());
+    }
+
 
 }
