@@ -39,12 +39,13 @@ public class GringottsEco implements Eco {
             return new InvalidAccount("virtual", id);
         }
 
-        GringottsAccount gAccount = Gringotts.instance.getAccounting().getAccount(owner);
+        GringottsAccount gAccount = new GringottsAccount(owner);
 
         return new ValidAccount(gAccount);
     }
 
-    
+
+
 
     /**
      * Player player account.
@@ -57,11 +58,12 @@ public class GringottsEco implements Eco {
         AccountHolder owner = accountOwners.get(TAG_PLAYER, id.toString());
 
         if (owner instanceof PlayerAccountHolder) {
-            return new ValidPlayerAccount(Gringotts.instance.getAccounting().getAccount(owner));
+            return new ValidPlayerAccount(new GringottsAccount(owner));
         }
 
         return new InvalidAccount(TAG_PLAYER, id.toString());
     }
+
 
     /**
      * Bank bank account.
