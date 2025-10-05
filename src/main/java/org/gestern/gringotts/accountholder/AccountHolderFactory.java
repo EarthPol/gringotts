@@ -20,20 +20,21 @@ public class AccountHolderFactory {
     private final LinkedHashMap<String, AccountHolderProvider> accountHolderProviders = new LinkedHashMap<>();
 
     public AccountHolderFactory() {
-        // Player provider always available
+        // linked HashMap maintains iteration order -> prefer player to be checked first
         accountHolderProviders.put("player", new PlayerAccountHolderProvider());
 
-        // Only add Towny providers when Towny is actually installed
-        if (Bukkit.getPluginManager().getPlugin("Towny") != null) {
-            accountHolderProviders.put("town",   new TownHolderProvider());
-            accountHolderProviders.put("nation", new NationHolderProvider());
-        }
+        // Town/Nation providers are added lazily once Towny is actually present & enabled.
+        // (We also attempt to add them immediately if Towny is already enabled.)
+        ensureTownyProvidersRegistered();
     }
 
-    public @NotNull Optional<AccountHolderProvider> getProvider(@Nullable String type) {
+
+    public Optional<AccountHolderProvider> getProvider(String type) {
+        ensureTownyProvidersRegistered(); // make sure Towny providers exist if Towny is now enabled
         if (type == null) return Optional.empty();
-        return Optional.ofNullable(accountHolderProviders.get(type.toLowerCase(Locale.ROOT)));
+        return Optional.ofNullable(this.accountHolderProviders.get(type.toLowerCase(java.util.Locale.ROOT)));
     }
+
 
     public boolean hasProvider(@Nullable String type) {
         return getProvider(type).isPresent();
@@ -46,6 +47,7 @@ public class AccountHolderFactory {
 
     /** Resolve holder by opaque id (UUID string, name, etc.). */
     public @Nullable AccountHolder get(@NotNull String id) {
+        ensureTownyProvidersRegistered();
         for (AccountHolderProvider provider : accountHolderProviders.values()) {
             AccountHolder h = provider.getAccountHolder(id);
             if (h != null) return h;
@@ -55,12 +57,14 @@ public class AccountHolderFactory {
 
     /** Resolve holder by explicit type and id. */
     public @Nullable AccountHolder get(@NotNull String type, @NotNull String id) {
+        ensureTownyProvidersRegistered();
         AccountHolderProvider p = accountHolderProviders.get(type.toLowerCase(Locale.ROOT));
         return p == null ? null : p.getAccountHolder(id);
     }
 
     /** Reverse map to a known type key. */
     public @NotNull String getType(@NotNull AccountHolder holder) {
+        ensureTownyProvidersRegistered();
         String n = holder.getClass().getSimpleName().toLowerCase(Locale.ROOT);
         if (n.contains("town"))   return "town";
         if (n.contains("nation")) return "nation";
@@ -69,8 +73,19 @@ public class AccountHolderFactory {
 
     /** List all known account names for a type. */
     public @NotNull Set<String> getAccountNames(@NotNull String type) {
+        ensureTownyProvidersRegistered();
         AccountHolderProvider p = accountHolderProviders.get(type.toLowerCase(Locale.ROOT));
         return p == null ? Collections.emptySet() : p.getAccountNames();
+    }
+
+    private void ensureTownyProvidersRegistered() {
+        var pm = org.bukkit.Bukkit.getPluginManager();
+        var towny = pm.getPlugin("Towny");
+        if (towny != null && towny.isEnabled()) {
+            // register once if missing
+            accountHolderProviders.computeIfAbsent("town",   k -> new org.gestern.gringotts.accountholder.town.TownHolderProvider());
+            accountHolderProviders.computeIfAbsent("nation", k -> new org.gestern.gringotts.accountholder.nation.NationHolderProvider());
+        }
     }
 
     /** Player provider (implements String, UUID, OfflinePlayer forms). */
@@ -113,7 +128,7 @@ public class AccountHolderFactory {
             return Stream.of(Bukkit.getOfflinePlayers())
                     .map(OfflinePlayer::getName)
                     .filter(Objects::nonNull)
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
+                    .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
         }
     }
 
