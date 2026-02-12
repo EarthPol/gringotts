@@ -56,7 +56,7 @@ public class GringottsAccount {
             }
         };
 
-        if (Bukkit.isTickThread()) {
+        if (Bukkit.isGlobalTickThread()) {
             runMe.run();
         } else {
             SchedulerUtil.runGlobal(runMe);
