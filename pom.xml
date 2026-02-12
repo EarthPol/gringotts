@@ -153,6 +153,13 @@
             <optional>true</optional>
         </dependency>
         <dependency>
+            <groupId>com.palmergames.bukkit.towny</groupId>
+            <artifactId>towny</artifactId>
+            <version>0.101.2.0</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
             <groupId>io.ebean</groupId>
             <artifactId>ebean-test</artifactId>
             <version>15.7.0</version>
@@ -193,6 +200,10 @@
         <repository>
             <id>placeholderapi</id>
             <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
+        </repository>
+        <repository>
+            <id>towny</id>
+            <url>https://repo.palmergames.com/repository/minecraft/</url>
         </repository>
     </repositories>
 

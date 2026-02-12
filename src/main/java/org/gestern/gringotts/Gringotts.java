@@ -34,6 +34,7 @@ import org.gestern.gringotts.data.EBeanDAO;
 import org.gestern.gringotts.dependency.DependencyProviderImpl;
 import org.gestern.gringotts.dependency.GenericDependency;
 import org.gestern.gringotts.dependency.placeholdersapi.PlaceholderAPIDependency;
+import org.gestern.gringotts.dependency.towny.TownyDependency;
 import org.gestern.gringotts.event.AccountListener;
 import org.gestern.gringotts.event.PlayerVaultListener;
 import org.gestern.gringotts.event.VaultCreator;
@@ -180,6 +181,24 @@ public class Gringotts extends JavaPlugin {
         } catch (IllegalArgumentException e) {
             getLogger().warning(
                     "Looks like PlaceholderAPI plugin is not compatible with Gringotts"
+            );
+        }
+
+        try {
+            Plugin plugin = this.dependencies.hookPlugin(
+                    "Towny",
+                    "com.palmergames.bukkit.towny.TownyAPI",
+                    "0.100.0.0"
+            );
+
+            if (plugin != null) {
+                if (!this.dependencies.registerDependency(new TownyDependency(plugin))) {
+                    getLogger().warning("Towny plugin is already assigned into the dependencies.");
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            getLogger().warning(
+                    "Looks like Towny plugin is not compatible with Gringotts"
             );
         }
 
