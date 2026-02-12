@@ -131,6 +131,12 @@ public class GringottsEco implements Eco {
      */
     @Override
     public Account getAccount(String id) {
+        try {
+            UUID uuid = UUID.fromString(id);
+            return player(uuid);
+        } catch (IllegalArgumentException ignored) {
+        }
+
         String[] parts = id.split("-", 2);
 
         if (parts.length == 1) {
