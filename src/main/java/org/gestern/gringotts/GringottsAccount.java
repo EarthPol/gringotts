@@ -477,7 +477,7 @@ public class GringottsAccount {
 
     private <V> V getTimeout(CompletableFuture<V> f) {
         try {
-            return f.get(1, TimeUnit.SECONDS);
+            return f.get(5, TimeUnit.SECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             throw new GringottsException(e);
         }

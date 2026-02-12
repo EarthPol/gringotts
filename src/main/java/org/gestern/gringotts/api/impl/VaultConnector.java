@@ -3,15 +3,16 @@ package org.gestern.gringotts.api.impl;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
+import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.gestern.gringotts.Gringotts;
-import org.gestern.gringotts.Util;
 import org.gestern.gringotts.api.Account;
 import org.gestern.gringotts.api.Eco;
 import org.gestern.gringotts.api.TransactionResult;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static org.gestern.gringotts.Language.LANG;
 
@@ -60,7 +61,7 @@ public class VaultConnector implements Economy {
 
     @Override
     public boolean hasAccount(String accountId) {
-        return eco.getAccount(accountId).exists();
+        return resolvePlayerAccount(accountId).exists();
     }
 
     @Override
@@ -70,7 +71,7 @@ public class VaultConnector implements Economy {
 
     @Override
     public double getBalance(String accountId) { // TODO optimize
-        return eco.getAccount(accountId).balance();
+        return resolvePlayerAccount(accountId).balance();
     }
 
     @Override
@@ -80,17 +81,17 @@ public class VaultConnector implements Economy {
 
     @Override
     public boolean has(String accountId, double amount) {
-        return eco.getAccount(accountId).has(amount);
+        return resolvePlayerAccount(accountId).has(amount);
     }
 
     @Override
     public boolean has(OfflinePlayer offlinePlayer, double amount) {
-        return eco.account(offlinePlayer.getUniqueId().toString()).has(amount);
+        return eco.player(offlinePlayer.getUniqueId()).has(amount);
     }
 
     @Override
     public EconomyResponse withdrawPlayer(String accountId, double amount) {
-        return withdrawPlayer(eco.getAccount(accountId), amount);
+        return withdrawPlayer(resolvePlayerAccount(accountId), amount);
     }
 
     @Override
@@ -116,8 +117,27 @@ public class VaultConnector implements Economy {
 
     @Override
     public EconomyResponse depositPlayer(String playerName, double amount) {
-        Account account = eco.getAccount(playerName);
+        Account account = resolvePlayerAccount(playerName);
         return depositPlayer(account, amount);
+    }
+
+    private Account resolvePlayerAccount(String accountId) {
+        try {
+            return eco.player(UUID.fromString(accountId));
+        } catch (IllegalArgumentException ignored) {
+        }
+
+        OfflinePlayer onlinePlayer = Bukkit.getPlayerExact(accountId);
+        if (onlinePlayer != null) {
+            return eco.player(onlinePlayer.getUniqueId());
+        }
+
+        OfflinePlayer cachedPlayer = Bukkit.getOfflinePlayerIfCached(accountId);
+        if (cachedPlayer != null) {
+            return eco.player(cachedPlayer.getUniqueId());
+        }
+
+        return eco.getAccount(accountId);
     }
 
     @Override
