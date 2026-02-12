@@ -7,8 +7,8 @@
 
     <properties>
         <maven.deploy.skip>false</maven.deploy.skip>
-        <maven.compiler.source>18</maven.compiler.source>
-        <maven.compiler.target>18</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -103,7 +103,7 @@
                                 <copy file="target\${project.artifactId}-${project.version}.jar"
                                       tofile="out\paper\1.21.4\plugins\${project.artifactId}.jar"/>
                                 <copy file="target\${project.artifactId}-${project.version}.jar"
-                                      tofile="out\paper\1.21.6\plugins\${project.artifactId}.jar"/>
+                                      tofile="out\paper\1.21.11\plugins\${project.artifactId}.jar"/>
                             </target>
                         </configuration>
                         <goals>
@@ -130,7 +130,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.6-R0.1-SNAPSHOT</version>
+            <version>1.21.11-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
