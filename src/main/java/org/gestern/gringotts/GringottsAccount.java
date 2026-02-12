@@ -56,10 +56,10 @@ public class GringottsAccount {
             }
         };
 
-        if (Bukkit.isPrimaryThread()) {
+        if (Bukkit.isGlobalTickThread()) {
             runMe.run();
         } else {
-            Bukkit.getScheduler().scheduleSyncDelayedTask(Gringotts.instance, runMe);
+            SchedulerUtil.runGlobal(runMe);
         }
 
         return f;

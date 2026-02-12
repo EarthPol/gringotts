@@ -18,7 +18,6 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.gestern.gringotts.accountholder.AccountHolderFactory;
 import org.gestern.gringotts.api.Eco;
 import org.gestern.gringotts.api.dependency.Dependency;
@@ -108,14 +107,11 @@ public class Gringotts extends JavaPlugin {
             // just call DAO once to ensure it's loaded before startup is complete
             dao = getDAO();
 
-            new BukkitRunnable() {
-                // Run once worlds are loaded
-                @Override
-                public void run() {
-                    dao.retrieveChests();
-                    pendingOperationManager.init();
-                }
-            }.runTask(instance);
+            // Run once worlds are loaded
+            Bukkit.getGlobalRegionScheduler().run(this, task -> {
+                dao.retrieveChests();
+                pendingOperationManager.init();
+            });
 
             // load and init configuration
             saveDefaultConfig(); // saves default configuration if no config.yml exists yet
